@@ -1,23 +1,27 @@
 # -*- coding: utf-8 -*-
 """LangGraph Memory Test"""
 
+import requests
+from typing import List, Dict
+from typing_extensions import TypedDict
+from langgraph.graph import END, StateGraph
+from langchain.prompts import PromptTemplate
+from langchain.chains import ConversationChain
+from langchain_groq import ChatGroq
+from pprint import pprint
 import os
 import time
 
 os.environ["GROQ_API_KEY"] = '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'
 os.environ["TAVILY_API_KEY"] = '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'
 
-### Tracing (optional)
-
-from pprint import pprint
+# Tracing (optional)
 
 
 # os.environ['LANGCHAIN TRACING V2'] = 'true'
 # os.environ['LANGCHAIN_ENDPOINT'] = 'https://api.smith.langchain.com'
 # os.environ['LANGCHAIN API KEY'] = userdata.get('LANGCHAIN_API_KEY')
 
-from langchain_groq import ChatGroq
-from langchain.chains import ConversationChain
 
 GROQ_LLM = ChatGroq(
     model="llama3-70b-8192",
@@ -30,19 +34,15 @@ conversation_with_summary = ConversationChain(
 # llama3-70b-8192
 # llama3-8b-8192
 
-from langchain.prompts import PromptTemplate
 
 """## Utils
 
 ## State
 """
 
-from langgraph.graph import END, StateGraph
 
-from typing_extensions import TypedDict
-from typing import List, Dict
+# State
 
-### State
 
 class GraphState(TypedDict):
     """
@@ -61,12 +61,14 @@ class GraphState(TypedDict):
     num_steps: int
     conversation_history: List[Dict[str, str]]
 
+
 """## Nodes
 
 1. categorize_question
 2. product_inquiry_response
 3. other_inquiry_response
 """
+
 
 def categorize_question(state: GraphState):
     # Definir la plantilla del prompt
@@ -93,15 +95,18 @@ def categorize_question(state: GraphState):
         state['conversation_history'] = []
 
     # Agregar la nueva pregunta al historial de conversación
-    state['conversation_history'].append({"rol": "usuario", "contenido": initial_question})
+    state['conversation_history'].append(
+        {"rol": "usuario", "contenido": initial_question})
 
     # Combinar el historial de conversación en un solo prompt
     combined_prompt = ""
     for mensaje in state['conversation_history']:
-        combined_prompt += f"{mensaje['rol'].capitalize()}: {mensaje['contenido']}\n"
+        combined_prompt += f"{mensaje['rol'].capitalize()
+                              }: {mensaje['contenido']}\n"
 
     # Agregar la pregunta actual al prompt
-    combined_prompt += prompt_template.format(initial_question=initial_question)
+    combined_prompt += prompt_template.format(
+        initial_question=initial_question)
 
     # Invocar la cadena de conversación con el prompt combinado
     respuesta = conversation_with_summary.predict(input=combined_prompt)
@@ -113,12 +118,11 @@ def categorize_question(state: GraphState):
 
     print(categoria_pregunta)
 
-    state.update({"question_category": categoria_pregunta, "num_steps": num_steps})
+    state.update(
+        {"question_category": categoria_pregunta, "num_steps": num_steps})
 
     return state
 
-
-import requests
 
 def product_inquiry_response(state):
     # Crear una plantilla de prompt que incluya los datos del producto
@@ -136,7 +140,45 @@ def product_inquiry_response(state):
     print("---REALIZANDO LLAMADA AL ENDPOINT DE PRODUCTOS---")
     # Realizar la solicitud HTTP para recuperar los datos del producto
     initial_time = time.time()
-    products = requests.get("https://dbmockapi.azurewebsites.net/products").json()
+    products = [
+        {
+            "nombre": "Perifar",
+            "precio": "$10 USD",
+            "descripcion": "Medicamento para el dolor",
+            "fabricante": "Laboratorios Smith",
+
+        },
+        {
+            "nombre": "Panadol",
+            "precio": "$15 USD",
+            "descripcion": "Medicamento para el mareo",
+            "fabricante": "Roemers",
+        },
+        {
+            "nombre": "Ibuprofeno",
+            "precio": "$20 USD",
+            "descripcion": "Medicamento para la fiebre",
+            "fabricante": "Laboratorios Jack",
+        },
+        {
+            "nombre": "Paracetamol",
+            "precio": "$25 USD",
+            "descripcion": "Medicamento para el dolor de cabeza",
+            "fabricante": "Laboratorios Sanofi",
+        },
+        {
+            "nombre": "Aspirina",
+            "precio": "$30 USD",
+            "descripcion": "Medicamento para el dolor de muelas",
+            "fabricante": "Laboratorios Smith",
+        },
+        {
+            "nombre": "Diclofenaco",
+            "precio": "$35 USD",
+            "descripcion": "Medicamento para el dolor de espalda",
+            "fabricante": "Laboratorios Smith",
+        }
+    ]
     print(f"Tiempo de respuesta de GET: {time.time() - initial_time}")
     print("---DANDO RESPUESTA A LA CONSULTA DE PRODUCTOS---")
     initial_question = state['initial_question']
@@ -144,14 +186,16 @@ def product_inquiry_response(state):
     num_steps += 1
 
     # Agregar la pregunta actual al prompt
-    input = prompt.template.format(initial_question=initial_question, products=products)
+    input = prompt.template.format(
+        initial_question=initial_question, products=products)
 
     # Invocar la cadena de conversación con el prompt combinado
     print(input)
     response = conversation_with_summary.predict(input=input)
     print(response)
     # Agregar la respuesta del modelo al historial de conversación
-    state['conversation_history'].append({"rol": "asistente", "contenido": response})
+    state['conversation_history'].append(
+        {"rol": "asistente", "contenido": response})
 
     state.update({"final_response": response, "num_steps": num_steps})
 
@@ -166,11 +210,13 @@ def other_inquiry_response(state):
     response = "Este asistente solo puede responder preguntas sobre productos."
 
     # Add the model's response to the conversation history
-    state['conversation_history'].append({"rol": "asistente", "contenido": response})
+    state['conversation_history'].append(
+        {"rol": "asistente", "contenido": response})
 
     state.update({"final_response": response, "num_steps": num_steps})
 
     return state
+
 
 def state_printer(state):
     """Imprime el estado."""
@@ -184,7 +230,9 @@ def state_printer(state):
         print(f"{message['rol'].capitalize()}: {message['contenido']}")
     return
 
+
 """## Conditional Edges"""
+
 
 def route_to_respond(state):
     """
@@ -208,6 +256,7 @@ def route_to_respond(state):
         # Manejar categoría inesperada
         print("---CATEGORÍA INESPERADA---")
         return "state_printer"  # O cualquier nodo predeterminado para manejar casos inesperados
+
 
 """## Build the Graph
 
@@ -244,6 +293,7 @@ app = workflow.compile()
 
 states = []
 
+
 def retrieve_state(conversation_id):
     global states
     for state in states:
@@ -257,6 +307,7 @@ def retrieve_state(conversation_id):
         "conversation_history": [],
         "conversation_id": conversation_id
     }
+
 
 def execute_agent(question, conversation_id):
     global states  # Ensure state is recognized as global
