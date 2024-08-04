@@ -7,6 +7,9 @@ __pycache__/
 *.egg-info/
 *.egg
 
+# Data
+data/*
+
 # Python bytecode
 *.pyc
 *.pyo
