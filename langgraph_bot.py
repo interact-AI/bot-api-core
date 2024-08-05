@@ -107,8 +107,7 @@ def categorize_question(state: GraphState):
     # Combinar el historial de conversación en un solo prompt
     combined_prompt = ""
     for mensaje in state['conversation_history']:
-        combined_prompt += f"{mensaje['rol'].capitalize()
-                              }: {mensaje['contenido']}\n"
+        combined_prompt += f"{mensaje['rol'].capitalize()}: {mensaje['contenido']}\n"
 
     # Agregar la pregunta actual al prompt
     combined_prompt += prompt_template.format(
@@ -381,15 +380,15 @@ def execute_agent(question, conversation_id):
 
 # NO BORRAR!! PARA PRUEBAS DESDE CONSOLA
 # 
-def main():
-    while True:
-        question = input("Ingresar la pregunta: ")
-        conversation_id = int(input("Ingresar ID de conversación: "))
-        try:
-            output = execute_agent(question, conversation_id)
-            print(output)
-        except Exception as e:
-            print(f"Error: {str(e)}")
+# def main():
+#     while True:
+#         question = input("Ingresar la pregunta: ")
+#         conversation_id = int(input("Ingresar ID de conversación: "))
+#         try:
+#             output = execute_agent(question, conversation_id)
+#             print(output)
+#         except Exception as e:
+#             print(f"Error: {str(e)}")
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
