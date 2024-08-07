@@ -11,16 +11,12 @@ from langchain_groq import ChatGroq
 from pprint import pprint
 import os
 import time
-
-os.environ["GROQ_API_KEY"] = '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'
-os.environ["TAVILY_API_KEY"] = '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'
-
-# Tracing (optional)
-
-
-# os.environ['LANGCHAIN TRACING V2'] = 'true'
-# os.environ['LANGCHAIN_ENDPOINT'] = 'https://api.smith.langchain.com'
-# os.environ['LANGCHAIN API KEY'] = userdata.get('LANGCHAIN_API_KEY')
+from langchain_community.vectorstores import Qdrant
+from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
+from qdrant_client import QdrantClient
+from langchain.chains import RetrievalQA
+from dotenv import load_dotenv
+load_dotenv()
 
 
 GROQ_LLM = ChatGroq(
@@ -28,6 +24,14 @@ GROQ_LLM = ChatGroq(
 )
 
 conversation_with_summary = ConversationChain(
+    llm=GROQ_LLM,
+)
+
+GROQ_LLM = ChatGroq(
+    model="llama3-8b-8192",
+)
+
+conversation_with_summary_8b = ConversationChain(
     llm=GROQ_LLM,
 )
 
@@ -66,11 +70,13 @@ class GraphState(TypedDict):
 
 1. categorize_question
 2. product_inquiry_response
-3. other_inquiry_response
+3. other_inquiry_response(RAG)
+4. state_printer
 """
 
 
 def categorize_question(state: GraphState):
+    initial_time = time.time()
     # Definir la plantilla del prompt
     prompt_template = """\
     Eres un Agente Clasificador de Preguntas que responde en español. Eres un experto en entender de qué trata una pregunta y eres capaz de categorizarla de manera útil.
@@ -101,15 +107,14 @@ def categorize_question(state: GraphState):
     # Combinar el historial de conversación en un solo prompt
     combined_prompt = ""
     for mensaje in state['conversation_history']:
-        combined_prompt += f"{mensaje['rol'].capitalize()
-                              }: {mensaje['contenido']}\n"
+        combined_prompt += f"{mensaje['rol'].capitalize()}: {mensaje['contenido']}\n"
 
     # Agregar la pregunta actual al prompt
     combined_prompt += prompt_template.format(
         initial_question=initial_question)
 
     # Invocar la cadena de conversación con el prompt combinado
-    respuesta = conversation_with_summary.predict(input=combined_prompt)
+    respuesta = conversation_with_summary_8b.predict(input=combined_prompt)
     # Analizar la respuesta para extraer la etiqueta de categoría
     if "producto" in respuesta.lower():
         categoria_pregunta = "producto"
@@ -121,10 +126,13 @@ def categorize_question(state: GraphState):
     state.update(
         {"question_category": categoria_pregunta, "num_steps": num_steps})
 
+    print(f"Tiempo de respuesta de NODO: {time.time() - initial_time}")
+
     return state
 
 
 def product_inquiry_response(state):
+    initial_time = time.time()
     # Crear una plantilla de prompt que incluya los datos del producto
     prompt = PromptTemplate(
         template="""\
@@ -138,7 +146,6 @@ def product_inquiry_response(state):
     )
 
     print("---REALIZANDO LLAMADA AL ENDPOINT DE PRODUCTOS---")
-    # Realizar la solicitud HTTP para recuperar los datos del producto
     initial_time = time.time()
     products = [
         {
@@ -199,21 +206,74 @@ def product_inquiry_response(state):
 
     state.update({"final_response": response, "num_steps": num_steps})
 
+    print(f"Tiempo de respuesta de NODO: {time.time() - initial_time}")
+    
     return state
 
+custom_prompt_template = """Utiliza la siguiente información para responder la pregunta del usuario.
+Si no conoces la respuesta, devuelve "RESPUESTA_NO_ENCONTRADA". No trates de inventar una respuesta.
+
+
+Contexto: {context}
+Pregunta: {question}
+
+
+Solo devuelve la respuesta útil a continuación y nada más.
+Respuesta útil:
+"""
+def set_custom_prompt():
+    """
+    Prompt template for QA retrieval for each vectorstore
+    """
+    prompt = PromptTemplate(template=custom_prompt_template,
+                            input_variables=['context', 'question'])
+    return prompt
+
+chat_model = ChatGroq(temperature=0, model_name="llama3-8b-8192")
+#chat_model = ChatGroq(temperature=0, model_name="Llama2-70b-4096")
+
+qdrant_url = os.getenv("QDRANT_URL")
+qdrant_api_key = os.getenv("QDRANT_API_KEY")
+client = QdrantClient(api_key=qdrant_api_key, url=qdrant_url)
+
+def retrieval_qa_chain(llm, prompt, vectorstore):
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=vectorstore.as_retriever(search_kwargs={'k': 3}),
+        return_source_documents=False,
+        chain_type_kwargs={'prompt': prompt}
+    )
+    return qa_chain
+
+def qa_bot():
+    embeddings = FastEmbedEmbeddings()
+    vectorstore = Qdrant(client=client, embeddings=embeddings, collection_name="rag")
+    llm = chat_model
+    qa_prompt = set_custom_prompt()
+    qa = retrieval_qa_chain(llm, qa_prompt, vectorstore)
+    return qa
 
 def other_inquiry_response(state):
-    print("---RESPONDIENDO A OTRA CONSULTA---")
+
+    initial_time = time.time()
+    print("---RESPONDIENDO A CONSULTA DESDE RAG---")
     num_steps = int(state['num_steps'])
     num_steps += 1
 
-    response = "Este asistente solo puede responder preguntas sobre productos."
+    chain = qa_bot()
+    
+    initial_question = state['initial_question']
+    
+    response = chain.invoke({"query": initial_question})["result"]
 
-    # Add the model's response to the conversation history
-    state['conversation_history'].append(
-        {"rol": "asistente", "contenido": response})
-
+    if "RESPUESTA_NO_ENCONTRADA" in response:
+        response = "Lo siento, no tengo información sobre eso."
+    
+    state['conversation_history'].append({"rol": "asistente", "contenido": response})
     state.update({"final_response": response, "num_steps": num_steps})
+
+    print(f"Tiempo de respuesta de NODO: {time.time() - initial_time}")
 
     return state
 
@@ -250,14 +310,13 @@ def route_to_respond(state):
         print("---RUTA A RESPUESTA DE CONSULTA DE PRODUCTO---")
         return "product_inquiry_response"
     elif question_category == 'otro':
-        print("---RUTA A OTRA CONSULTA---")
+        print("---RUTA A RESPUESTA DE CONSULTA DESDE RAG---")
         return "other_inquiry_response"
     else:
-        # Manejar categoría inesperada
+        # Manejar categoría inesperada (error nodo clasificador)
         print("---CATEGORÍA INESPERADA---")
-        return "state_printer"  # O cualquier nodo predeterminado para manejar casos inesperados
-
-
+        return "state_printer" 
+    
 """## Build the Graph
 
 ### Add Nodes
@@ -317,3 +376,19 @@ def execute_agent(question, conversation_id):
     output = app.invoke(state)
 
     return output
+
+
+# NO BORRAR!! PARA PRUEBAS DESDE CONSOLA
+# 
+# def main():
+#     while True:
+#         question = input("Ingresar la pregunta: ")
+#         conversation_id = int(input("Ingresar ID de conversación: "))
+#         try:
+#             output = execute_agent(question, conversation_id)
+#             print(output)
+#         except Exception as e:
+#             print(f"Error: {str(e)}")
+
+# if __name__ == "__main__":
+#     main()
