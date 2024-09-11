@@ -4,7 +4,7 @@
 #
 #    pip-compile requirements.in
 #
-aiohttp==3.9.3
+aiohttp==3.9.5
     # via
     #   botbuilder-integration-aiohttp
     #   langchain
@@ -18,12 +18,11 @@ anyio==4.4.0
     # via
     #   groq
     #   httpx
-    #   openai
 async-timeout==4.0.3
     # via
     #   aiohttp
     #   langchain
-attrs==23.2.0
+attrs==24.2.0
     # via aiohttp
 azure-core==1.30.2
     # via msrest
@@ -31,31 +30,31 @@ backoff==2.2.1
     # via unstructured
 beautifulsoup4==4.12.3
     # via unstructured
-botbuilder-core==4.15.0
+botbuilder-core==4.16.1
     # via botbuilder-integration-aiohttp
-botbuilder-integration-aiohttp==4.15.0
+botbuilder-integration-aiohttp==4.16.1
     # via -r requirements.in
-botbuilder-schema==4.15.0
+botbuilder-schema==4.16.1
     # via
     #   botbuilder-core
     #   botbuilder-integration-aiohttp
     #   botframework-connector
     #   botframework-streaming
-botframework-connector==4.15.0
+botframework-connector==4.16.1
     # via
     #   botbuilder-core
     #   botbuilder-integration-aiohttp
     #   botframework-streaming
-botframework-streaming==4.15.0
+botframework-streaming==4.16.1
     # via botbuilder-core
-certifi==2024.6.2
+certifi==2024.7.4
     # via
     #   httpcore
     #   httpx
     #   msrest
     #   requests
     #   unstructured-client
-cffi==1.16.0
+cffi==1.17.0
     # via cryptography
 chardet==5.2.0
     # via unstructured
@@ -69,7 +68,7 @@ click==8.1.7
     #   nltk
 coloredlogs==15.0.1
     # via onnxruntime
-cryptography==42.0.8
+cryptography==43.0.0
     # via
     #   msal
     #   pyjwt
@@ -79,25 +78,23 @@ dataclasses-json==0.6.7
     #   llama-index-core
     #   unstructured
     #   unstructured-client
-deepdiff==7.0.1
+deepdiff==8.0.1
     # via unstructured-client
 deprecated==1.2.14
     # via llama-index-core
 dirtyjson==1.0.8
     # via llama-index-core
 distro==1.9.0
-    # via
-    #   groq
-    #   openai
-duckduckgo-search==6.1.7
+    # via groq
+duckduckgo-search==6.2.11
     # via -r requirements.in
 emoji==2.12.1
     # via unstructured
-exceptiongroup==1.2.1
+exceptiongroup==1.2.2
     # via anyio
-fastembed==0.3.1
+fastembed==0.3.6
     # via -r requirements.in
-filelock==3.15.1
+filelock==3.15.4
     # via huggingface-hub
 filetype==1.2.0
     # via unstructured
@@ -107,19 +104,19 @@ frozenlist==1.4.1
     # via
     #   aiohttp
     #   aiosignal
-fsspec==2024.6.0
+fsspec==2024.6.1
     # via
     #   huggingface-hub
     #   llama-index-core
 greenlet==3.0.3
     # via sqlalchemy
-groq==0.9.0
+groq==0.10.0
     # via langchain-groq
-grpcio==1.64.1
+grpcio==1.66.1
     # via
     #   grpcio-tools
     #   qdrant-client
-grpcio-tools==1.64.1
+grpcio-tools==1.66.1
     # via qdrant-client
 h11==0.14.0
     # via httpcore
@@ -129,15 +126,14 @@ hpack==4.0.0
     # via h2
 httpcore==1.0.5
     # via httpx
-httpx[http2]==0.27.0
+httpx[http2]==0.27.2
     # via
     #   groq
+    #   langsmith
     #   llama-index-core
-    #   llamaindex-py-client
-    #   openai
     #   qdrant-client
     #   unstructured-client
-huggingface-hub==0.23.4
+huggingface-hub==0.24.6
     # via
     #   fastembed
     #   tokenizers
@@ -145,14 +141,14 @@ humanfriendly==10.0
     # via coloredlogs
 hyperframe==6.0.1
     # via h2
-idna==3.7
+idna==3.8
     # via
     #   anyio
     #   httpx
     #   requests
     #   unstructured-client
     #   yarl
-importlib-metadata==7.1.0
+importlib-metadata==8.4.0
     # via markdown
 isodate==0.6.1
     # via msrest
@@ -166,47 +162,48 @@ jsonpickle==1.4.2
     # via botbuilder-core
 jsonpointer==3.0.0
     # via jsonpatch
-langchain==0.2.5
+langchain==0.2.15
     # via
     #   -r requirements.in
     #   langchain-community
-langchain-community==0.2.5
+langchain-community==0.2.14
     # via -r requirements.in
-langchain-core==0.2.9
+langchain-core==0.2.36
     # via
     #   langchain
     #   langchain-community
     #   langchain-groq
     #   langchain-text-splitters
     #   langgraph
-langchain-groq==0.1.5
+    #   langgraph-checkpoint
+langchain-groq==0.1.9
     # via -r requirements.in
-langchain-text-splitters==0.2.1
+langchain-text-splitters==0.2.2
     # via langchain
-langchainhub==0.1.20
+langchainhub==0.1.21
     # via -r requirements.in
 langdetect==1.0.9
     # via unstructured
-langgraph==0.0.69
+langgraph==0.2.14
     # via -r requirements.in
-langsmith==0.1.80
+langgraph-checkpoint==1.0.6
+    # via langgraph
+langsmith==0.1.106
     # via
     #   langchain
     #   langchain-community
     #   langchain-core
-llama-index-core==0.10.46
+llama-index-core==0.11.2
     # via llama-parse
-llama-parse==0.4.4
+llama-parse==0.5.0
     # via -r requirements.in
-llamaindex-py-client==0.1.19
-    # via llama-index-core
 loguru==0.7.2
     # via fastembed
-lxml==5.2.2
+lxml==5.3.0
     # via unstructured
-markdown==3.6
+markdown==3.7
     # via unstructured
-marshmallow==3.21.3
+marshmallow==3.22.0
     # via
     #   dataclasses-json
     #   unstructured-client
@@ -214,7 +211,7 @@ mmh3==4.1.0
     # via fastembed
 mpmath==1.3.0
     # via sympy
-msal==1.28.1
+msal==1.30.0
     # via botframework-connector
 msrest==0.7.1
     # via
@@ -234,7 +231,7 @@ nest-asyncio==1.6.0
     #   unstructured-client
 networkx==3.2.1
     # via llama-index-core
-nltk==3.8.1
+nltk==3.9.1
     # via
     #   llama-index-core
     #   unstructured
@@ -246,23 +243,18 @@ numpy==1.26.4
     #   llama-index-core
     #   onnx
     #   onnxruntime
-    #   pandas
     #   qdrant-client
     #   unstructured
 oauthlib==3.2.2
     # via requests-oauthlib
-onnx==1.16.1
+onnx==1.16.2
     # via fastembed
-onnxruntime==1.18.0
+onnxruntime==1.19.0
     # via fastembed
-openai==1.34.0
-    # via llama-index-core
-ordered-set==4.1.0
+orderly-set==5.2.2
     # via deepdiff
-orjson==3.10.5
-    # via
-    #   duckduckgo-search
-    #   langsmith
+orjson==3.10.7
+    # via langsmith
 packaging==24.1
     # via
     #   huggingface-hub
@@ -271,66 +263,61 @@ packaging==24.1
     #   marshmallow
     #   onnxruntime
     #   unstructured-client
-pandas==2.2.2
-    # via llama-index-core
-pillow==10.3.0
+pillow==10.4.0
     # via
     #   fastembed
     #   llama-index-core
-portalocker==2.8.2
+portalocker==2.10.1
     # via qdrant-client
-protobuf==5.27.1
+primp==0.6.1
+    # via duckduckgo-search
+protobuf==5.28.0
     # via
     #   grpcio-tools
     #   onnx
     #   onnxruntime
+psutil==6.0.0
+    # via unstructured
 pycparser==2.22
     # via cffi
-pydantic==2.7.4
+pydantic==2.8.2
     # via
     #   groq
     #   langchain
     #   langchain-core
     #   langsmith
-    #   llamaindex-py-client
-    #   openai
+    #   llama-index-core
     #   qdrant-client
-pydantic-core==2.18.4
+pydantic-core==2.20.1
     # via pydantic
-pyjwt[crypto]==2.8.0
+pyjwt[crypto]==2.9.0
     # via
     #   botframework-connector
     #   msal
-pypdf==4.2.0
+pypdf==4.3.1
     # via unstructured-client
-pyreqwest-impersonate==0.4.8
-    # via duckduckgo-search
 pystemmer==2.2.0.1
     # via fastembed
 python-dateutil==2.9.0.post0
-    # via
-    #   pandas
-    #   unstructured-client
+    # via unstructured-client
 python-dotenv==1.0.1
     # via -r requirements.in
 python-iso639==2024.4.27
     # via unstructured
 python-magic==0.4.27
     # via unstructured
-pytz==2024.1
-    # via pandas
-pyyaml==6.0.1
+pyyaml==6.0.2
     # via
     #   huggingface-hub
     #   langchain
     #   langchain-community
     #   langchain-core
     #   llama-index-core
-qdrant-client==1.9.1
+qdrant-client==1.11.1
     # via -r requirements.in
-rapidfuzz==3.9.3
+rapidfuzz==3.9.6
     # via unstructured
-regex==2024.5.15
+regex==2024.7.24
     # via
     #   nltk
     #   tiktoken
@@ -367,21 +354,20 @@ sniffio==1.3.1
     #   anyio
     #   groq
     #   httpx
-    #   openai
 snowballstemmer==2.2.0
     # via fastembed
-soupsieve==2.5
+soupsieve==2.6
     # via beautifulsoup4
-sqlalchemy[asyncio]==2.0.31
+sqlalchemy[asyncio]==2.0.32
     # via
     #   langchain
     #   langchain-community
     #   llama-index-core
-sympy==1.12.1
+sympy==1.13.2
     # via onnxruntime
 tabulate==0.9.0
     # via unstructured
-tenacity==8.3.0
+tenacity==8.5.0
     # via
     #   langchain
     #   langchain-community
@@ -391,15 +377,14 @@ tiktoken==0.7.0
     # via
     #   -r requirements.in
     #   llama-index-core
-tokenizers==0.19.1
+tokenizers==0.20.0
     # via fastembed
-tqdm==4.66.4
+tqdm==4.66.5
     # via
     #   fastembed
     #   huggingface-hub
     #   llama-index-core
     #   nltk
-    #   openai
     #   unstructured
 types-requests==2.31.0.6
     # via langchainhub
@@ -415,8 +400,8 @@ typing-extensions==4.12.2
     #   emoji
     #   groq
     #   huggingface-hub
+    #   langchain-core
     #   llama-index-core
-    #   openai
     #   pydantic
     #   pydantic-core
     #   pypdf
@@ -429,11 +414,9 @@ typing-inspect==0.9.0
     #   dataclasses-json
     #   llama-index-core
     #   unstructured-client
-tzdata==2024.1
-    # via pandas
-unstructured[md]==0.14.6
+unstructured[md]==0.15.8
     # via -r requirements.in
-unstructured-client==0.23.7
+unstructured-client==0.25.5
     # via unstructured
 urllib3==1.26.19
     # via
@@ -450,7 +433,7 @@ yarl==1.9.4
     # via
     #   aiohttp
     #   botbuilder-integration-aiohttp
-zipp==3.19.2
+zipp==3.20.1
     # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:

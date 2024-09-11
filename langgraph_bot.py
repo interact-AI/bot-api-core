@@ -16,23 +16,34 @@ from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from qdrant_client import QdrantClient
 from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
+from langsmith import traceable
 load_dotenv()
 
 
-GROQ_LLM = ChatGroq(
+# PRODUCT SEARCH DEPENDENCIES
+import getpass
+
+from langchain_community.utilities import SQLDatabase
+from langchain.chains import create_sql_query_chain
+# PRODUCT SEARCH DEPENDENCIES
+
+
+GROQ_LLM_70 = ChatGroq(
     model="llama3-70b-8192",
 )
 
-conversation_with_summary = ConversationChain(
-    llm=GROQ_LLM,
+conversation_with_summary_70b = ConversationChain(
+    llm=GROQ_LLM_70,
+    # prompt=""
 )
 
-GROQ_LLM = ChatGroq(
+GROQ_LLM_8 = ChatGroq(
     model="llama3-8b-8192",
 )
 
 conversation_with_summary_8b = ConversationChain(
-    llm=GROQ_LLM,
+    llm=GROQ_LLM_8,
+    # prompt=""
 )
 
 # llama3-70b-8192
@@ -64,6 +75,8 @@ class GraphState(TypedDict):
     final_response: str
     num_steps: int
     conversation_history: List[Dict[str, str]]
+    relevant_products: List[str]
+    product_query: str
 
 
 """## Nodes
@@ -74,22 +87,25 @@ class GraphState(TypedDict):
 4. state_printer
 """
 
-
+@traceable
 def categorize_question(state: GraphState):
     initial_time = time.time()
     # Definir la plantilla del prompt
+    # Este nodo no sabe de medicamentos, por lo que mediante el prompt debemos buscar evitar el siguiente comportamiento:
+    #   Pregunta: Hola, necesito perifar, que opciones tienen?
+    #   Categoría de Pregunta: otro
+    #   Respuesta: Lo siento, no tengo información sobre eso.
     prompt_template = """\
-    Eres un Agente Clasificador de Preguntas que responde en español. Eres un experto en entender de qué trata una pregunta y eres capaz de categorizarla de manera útil.
-
-    Realiza un análisis exhaustivo de la pregunta proporcionada y clasifícala en una de las siguientes categorías:
-        producto - utilizado cuando la pregunta está relacionada con un producto
-        otro - utilizado cuando la pregunta no está relacionada con un producto
+    Eres un Agente categorizador de mensajes recibidos por una farmacia. Respondes en español.
+    Realiza un análisis exhaustivo del mensaje proporcionado y clasifícalo en una de las siguientes categorías:
+        producto - cuando el mensaje está relacionado con productos o medicamentos de la farmacia. Un producto puede ser un mediacmento del que no conoces el nombre, si en la pregunta hay un nombre desconocido, se debe clasificar como producto.
+        otro - cuando el mensaje no está relacionado con productos de la farmacia.
 
     Proporciona una sola palabra con la categoría (producto, otro)
     ej:
     producto
 
-    CONTENIDO DE LA PREGUNTA:\n\n {initial_question} \n\n
+    CONTENIDO DE LA PREGUNTA:\n {initial_question} \n
     """
     print("---CLASIFICANDO PREGUNTA INICIAL---")
     initial_question = state['initial_question']
@@ -106,9 +122,9 @@ def categorize_question(state: GraphState):
 
     # Combinar el historial de conversación en un solo prompt
     combined_prompt = ""
-    for mensaje in state['conversation_history']:
-        combined_prompt += f"{mensaje['rol'].capitalize()
-                              }: {mensaje['contenido']}\n"
+    # TODO: Agregar el historial de conversación al prompt. Que el historial de conversación no contenga el mensaje actual, solo los anteriores.
+    # for mensaje in state['conversation_history']:
+    #     combined_prompt += f"{mensaje['rol'].capitalize()}: {mensaje['contenido']}\n"
 
     # Agregar la pregunta actual al prompt
     combined_prompt += prompt_template.format(
@@ -131,7 +147,28 @@ def categorize_question(state: GraphState):
 
     return state
 
+@traceable
+def product_search(state):
+    db_uri = os.getenv("SQL_DATABASE_URI")
+    db = SQLDatabase.from_uri(db_uri)
+    print("-- SQL DATABASE --")
+    print(f'SQL DATABASE DIALECT: {db.dialect}')
+    print(f'SQL DATABASE TABLES: {db.get_usable_table_names()}')
 
+    chain = create_sql_query_chain(GROQ_LLM_8, db)
+
+    base_question = "Esta pregunta puede contener un nombre de producto o medicamento desconocido. Si hay un nombre desconocido, buscalo en la columna Nombre."
+    response = chain.invoke({ "question": f'{base_question} {state["initial_question"]}'})
+    print(f'SQL chain response: {response}')
+    sql_query = response.split("\nSQLQuery:")[1]
+    print(f'SQL Query: {sql_query}')
+    result = db.run(sql_query)
+    state['product_query'] = sql_query
+    state['relevant_products'] = result
+
+    return state
+
+@traceable
 def product_inquiry_response(state):
     initial_time = time.time()
     # Crear una plantilla de prompt que incluya los datos del producto
@@ -139,236 +176,16 @@ def product_inquiry_response(state):
         template="""\
         Eres un Agente de Información de Productos que trabaja en una Farmacia. Eres un experto en entender sobre qué trata una pregunta y puedes proporcionar información de productos concisa y relevante.
 
-        Por favor, proporciona una respuesta directa a la pregunta (CONTENIDO DE LA PREGUNTA) basada en los datos del producto como si ya los conocieras.
-        DATOS DEL PRODUCTO:\n{products}\n
-        CONTENIDO DE LA PREGUNTA:\n\n {initial_question} \n\n
+        Por favor, proporciona una respuesta directa a la pregunta (CONTENIDO DE LA PREGUNTA) basada en los productos.
+        Los productos fueron encontrados en la base de datos de la farmacia con la siguiente consulta SQL: {product_query}
+        Productos encontrados:\n{products}\n
+        CONTENIDO DE LA PREGUNTA:\n {initial_question} \n
         """,
         input_variables=["products", "initial_question"],
     )
 
     print("---REALIZANDO LLAMADA AL ENDPOINT DE PRODUCTOS---")
-    initial_time = time.time()
-    products = [
-        {
-            "nombre": "Perifar",
-            "precio": "$10 USD",
-            "descripcion": "Medicamento para el dolor",
-            "fabricante": "Laboratorios Smith",
-
-        },
-        {
-            "nombre": "Perifar",
-            "precio": "$10 USD",
-            "descripcion": "Medicamento para el dolor",
-            "fabricante": "Laboratorios Smith",
-
-        },
-        {
-            "nombre": "Panadol",
-            "precio": "$15 USD",
-            "descripcion": "Medicamento para el mareo",
-            "fabricante": "Roemers",
-        },
-        {
-            "nombre": "Paracetamol",
-            "precio": "$25 USD",
-            "descripcion": "Medicamento para el dolor de cabeza",
-            "fabricante": "Laboratorios Sanofi",
-        },
-        {
-            "nombre": "Aspirina",
-            "precio": "$30 USD",
-            "descripcion": "Medicamento para el dolor de muelas",
-            "fabricante": "Laboratorios Smith",
-        },
-        {
-            "nombre": "Diclofenaco",
-            "precio": "$35 USD",
-            "descripcion": "Medicamento para el dolor de espalda",
-            "fabricante": "Laboratorios Smith",
-        },
-        {
-            "nombre": "Ibuprofeno",
-            "precio": "$28 USD",
-            "descripcion": "Medicamento antiinflamatorio y analgésico",
-            "fabricante": "Laboratorios Bayer"
-        },
-        {
-            "nombre": "Amoxicilina",
-            "precio": "$40 USD",
-            "descripcion": "Antibiótico de amplio espectro",
-            "fabricante": "Laboratorios Pfizer"
-        },
-        {
-            "nombre": "Loratadina",
-            "precio": "$15 USD",
-            "descripcion": "Antihistamínico para alergias",
-            "fabricante": "Laboratorios GSK"
-        },
-        {
-            "nombre": "Omeprazol",
-            "precio": "$22 USD",
-            "descripcion": "Medicamento para el reflujo gástrico",
-            "fabricante": "Laboratorios AstraZeneca"
-        },
-        {
-            "nombre": "Metformina",
-            "precio": "$18 USD",
-            "descripcion": "Medicamento para la diabetes tipo 2",
-            "fabricante": "Laboratorios Novartis"
-        },
-        {
-            "nombre": "Simvastatina",
-            "precio": "$25 USD",
-            "descripcion": "Medicamento para reducir el colesterol",
-            "fabricante": "Laboratorios Merck"
-        },
-        {
-            "nombre": "Clopidogrel",
-            "precio": "$35 USD",
-            "descripcion": "Medicamento para prevenir coágulos sanguíneos",
-            "fabricante": "Laboratorios Sanofi"
-        },
-        {
-            "nombre": "Atenolol",
-            "precio": "$20 USD",
-            "descripcion": "Medicamento para la hipertensión",
-            "fabricante": "Laboratorios AstraZeneca"
-        },
-        {
-            "nombre": "Furosemida",
-            "precio": "$12 USD",
-            "descripcion": "Diurético para tratar la retención de líquidos",
-            "fabricante": "Laboratorios Roche"
-        },
-        {
-            "nombre": "Ciprofloxacino",
-            "precio": "$32 USD",
-            "descripcion": "Antibiótico de amplio espectro",
-            "fabricante": "Laboratorios Bayer"
-        },
-        {
-            "nombre": "Azitromicina",
-            "precio": "$38 USD",
-            "descripcion": "Antibiótico para infecciones bacterianas",
-            "fabricante": "Laboratorios Pfizer"
-        },
-        {
-            "nombre": "Captopril",
-            "precio": "$18 USD",
-            "descripcion": "Medicamento para la hipertensión y la insuficiencia cardíaca",
-            "fabricante": "Laboratorios Bristol-Myers Squibb"
-        },
-        {
-            "nombre": "Fluoxetina",
-            "precio": "$22 USD",
-            "descripcion": "Antidepresivo inhibidor selectivo de la recaptación de serotonina",
-            "fabricante": "Laboratorios Lilly"
-        },
-        {
-            "nombre": "Metronidazol",
-            "precio": "$14 USD",
-            "descripcion": "Antibiótico y antiparasitario",
-            "fabricante": "Laboratorios Pfizer"
-        },
-        {
-            "nombre": "Salbutamol",
-            "precio": "$20 USD",
-            "descripcion": "Broncodilatador para el asma",
-            "fabricante": "Laboratorios GSK"
-        },
-        {
-            "nombre": "Losartán",
-            "precio": "$27 USD",
-            "descripcion": "Medicamento para la hipertensión",
-            "fabricante": "Laboratorios Merck"
-        },
-        {
-            "nombre": "Levotiroxina",
-            "precio": "$25 USD",
-            "descripcion": "Hormona sintética para el tratamiento del hipotiroidismo",
-            "fabricante": "Laboratorios Abbott"
-        },
-        {
-            "nombre": "Warfarina",
-            "precio": "$30 USD",
-            "descripcion": "Anticoagulante para prevenir trombos",
-            "fabricante": "Laboratorios Bristol-Myers Squibb"
-        },
-        {
-            "nombre": "Enalapril",
-            "precio": "$19 USD",
-            "descripcion": "Medicamento para la hipertensión y la insuficiencia cardíaca",
-            "fabricante": "Laboratorios Merck"
-        },
-        {
-            "nombre": "Ranitidina",
-            "precio": "$15 USD",
-            "descripcion": "Medicamento para la acidez estomacal",
-            "fabricante": "Laboratorios GSK"
-        },
-        {
-            "nombre": "Naproxeno",
-            "precio": "$25 USD",
-            "descripcion": "Medicamento antiinflamatorio y analgésico",
-            "fabricante": "Laboratorios Bayer"
-        },
-        {
-            "nombre": "Tamsulosina",
-            "precio": "$28 USD",
-            "descripcion": "Medicamento para el tratamiento de la hiperplasia prostática benigna",
-            "fabricante": "Laboratorios Boehringer Ingelheim"
-        },
-        {
-            "nombre": "Gabapentina",
-            "precio": "$35 USD",
-            "descripcion": "Medicamento para el dolor neuropático",
-            "fabricante": "Laboratorios Pfizer"
-        },
-        {
-            "nombre": "Carbamazepina",
-            "precio": "$30 USD",
-            "descripcion": "Anticonvulsivante para el tratamiento de la epilepsia",
-            "fabricante": "Laboratorios Novartis"
-        },
-        {
-            "nombre": "Metoclopramida",
-            "precio": "$18 USD",
-            "descripcion": "Medicamento para el control de náuseas y vómitos",
-            "fabricante": "Laboratorios Roche"
-        },
-        {
-            "nombre": "Clonazepam",
-            "precio": "$32 USD",
-            "descripcion": "Medicamento para tratar trastornos de ansiedad",
-            "fabricante": "Laboratorios Roche"
-        },
-        {
-            "nombre": "Alprazolam",
-            "precio": "$29 USD",
-            "descripcion": "Medicamento para el tratamiento de trastornos de ansiedad",
-            "fabricante": "Laboratorios Pfizer"
-        },
-        {
-            "nombre": "Diazepam",
-            "precio": "$20 USD",
-            "descripcion": "Medicamento ansiolítico y relajante muscular",
-            "fabricante": "Laboratorios Roche"
-        },
-        {
-            "nombre": "Prednisona",
-            "precio": "$22 USD",
-            "descripcion": "Corticosteroide para reducir la inflamación",
-            "fabricante": "Laboratorios Pfizer"
-        },
-        {
-            "nombre": "Clotrimazol",
-            "precio": "$15 USD",
-            "descripcion": "Antifúngico para infecciones por hongos",
-            "fabricante": "Laboratorios Bayer"
-        }
-    ]
-    print(f"Tiempo de respuesta de GET: {time.time() - initial_time}")
+    products = state['relevant_products']
     print("---DANDO RESPUESTA A LA CONSULTA DE PRODUCTOS---")
     initial_question = state['initial_question']
     num_steps = int(state['num_steps'])
@@ -376,11 +193,11 @@ def product_inquiry_response(state):
 
     # Agregar la pregunta actual al prompt
     input = prompt.template.format(
-        initial_question=initial_question, products=products)
+        initial_question=initial_question, products=products, product_query=state['product_query'])
 
     # Invocar la cadena de conversación con el prompt combinado
     print(input)
-    response = conversation_with_summary.predict(input=input)
+    response = conversation_with_summary_70b.predict(input=input)
     print(response)
     # Agregar la respuesta del modelo al historial de conversación
     state['conversation_history'].append(
@@ -499,7 +316,7 @@ def route_to_respond(state):
 
     if question_category == 'producto':
         print("---RUTA A RESPUESTA DE CONSULTA DE PRODUCTO---")
-        return "product_inquiry_response"
+        return "product_response"
     elif question_category == 'otro':
         print("---RUTA A RESPUESTA DE CONSULTA DESDE RAG---")
         return "other_inquiry_response"
@@ -508,33 +325,31 @@ def route_to_respond(state):
         print("---CATEGORÍA INESPERADA---")
         return "state_printer"
 
-
 """## Build the Graph
-
 ### Add Nodes
 """
-
 workflow = StateGraph(GraphState)
 
 # Define the nodes
 workflow.add_node("categorize_question", categorize_question)
+workflow.add_node("product_search", product_search)
 workflow.add_node("product_inquiry_response", product_inquiry_response)
 workflow.add_node("state_printer", state_printer)
 workflow.add_node("other_inquiry_response", other_inquiry_response)
 
 """### Add Edges"""
-
 workflow.set_entry_point("categorize_question")
 
 workflow.add_conditional_edges(
     "categorize_question",
     route_to_respond,
     {
-        "product_inquiry_response": "product_inquiry_response",
+        "product_response": "product_search",
         "other_inquiry_response": "other_inquiry_response",
     },
 )
 
+workflow.add_edge("product_search", "product_inquiry_response")
 workflow.add_edge("product_inquiry_response", "state_printer")
 workflow.add_edge("other_inquiry_response", "state_printer")
 workflow.add_edge("state_printer", END)
@@ -543,7 +358,6 @@ workflow.add_edge("state_printer", END)
 app = workflow.compile()
 
 states = []
-
 
 def retrieve_state(conversation_id):
     global states
@@ -559,7 +373,6 @@ def retrieve_state(conversation_id):
         "conversation_id": conversation_id
     }
 
-
 def execute_agent(question, conversation_id):
     global states  # Ensure state is recognized as global
     state = retrieve_state(conversation_id)
@@ -569,18 +382,14 @@ def execute_agent(question, conversation_id):
 
     return output
 
-
 # NO BORRAR!! PARA PRUEBAS DESDE CONSOLA
-#
-# def main():
-#     while True:
-#         question = input("Ingresar la pregunta: ")
-#         conversation_id = int(input("Ingresar ID de conversación: "))
-#         try:
-#             output = execute_agent(question, conversation_id)
-#             print(output)
-#         except Exception as e:
-#             print(f"Error: {str(e)}")
 
-# if __name__ == "__main__":
-#     main()
+def main():
+    while True:
+        question = input("Ingresar la pregunta: ")
+        conversation_id = int(input("Ingresar ID de conversación: "))
+        output = execute_agent(question, conversation_id)
+        print(output)
+
+if __name__ == "__main__":
+    main()

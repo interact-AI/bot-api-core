@@ -5,11 +5,11 @@ langchain_community
 tiktoken
 langchainhub
 langchain
-langgraph
+langgraph==0.2.14
 typing_extensions
 typing
 langchain-community
-llama-parse 
+llama-parse
 qdrant_client
 python-dotenv
 fastembed
