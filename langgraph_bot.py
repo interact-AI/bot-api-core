@@ -17,16 +17,16 @@ from qdrant_client import QdrantClient
 from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
 from langsmith import traceable
-load_dotenv()
 
+load_dotenv()
 
 # PRODUCT SEARCH DEPENDENCIES
 import getpass
 
 from langchain_community.utilities import SQLDatabase
 from langchain.chains import create_sql_query_chain
-# PRODUCT SEARCH DEPENDENCIES
 
+# PRODUCT SEARCH DEPENDENCIES
 
 GROQ_LLM_70 = ChatGroq(
     model="llama3-70b-8192",
@@ -34,7 +34,6 @@ GROQ_LLM_70 = ChatGroq(
 
 conversation_with_summary_70b = ConversationChain(
     llm=GROQ_LLM_70,
-    # prompt=""
 )
 
 GROQ_LLM_8 = ChatGroq(
@@ -43,22 +42,17 @@ GROQ_LLM_8 = ChatGroq(
 
 conversation_with_summary_8b = ConversationChain(
     llm=GROQ_LLM_8,
-    # prompt=""
 )
 
 # llama3-70b-8192
 # llama3-8b-8192
-
 
 """## Utils
 
 ## State
 """
 
-
 # State
-
-
 class GraphState(TypedDict):
     """
     Represents the state of our graph.
@@ -70,6 +64,7 @@ class GraphState(TypedDict):
         num_steps: number of steps
         conversation_history: list of conversation history
     """
+
     initial_question: str
     question_category: str
     final_response: str
@@ -77,7 +72,6 @@ class GraphState(TypedDict):
     conversation_history: List[Dict[str, str]]
     relevant_products: List[str]
     product_query: str
-
 
 """## Nodes
 
@@ -108,17 +102,18 @@ def categorize_question(state: GraphState):
     CONTENIDO DE LA PREGUNTA:\n {initial_question} \n
     """
     print("---CLASIFICANDO PREGUNTA INICIAL---")
-    initial_question = state['initial_question']
-    num_steps = int(state['num_steps'])
+    initial_question = state["initial_question"]
+    num_steps = int(state["num_steps"])
     num_steps += 1
 
     # Inicializar historial de conversación si no está presente
-    if state.get('conversation_history') is None:
-        state['conversation_history'] = []
+    if state.get("conversation_history") is None:
+        state["conversation_history"] = []
 
     # Agregar la nueva pregunta al historial de conversación
-    state['conversation_history'].append(
-        {"rol": "usuario", "contenido": initial_question})
+    state["conversation_history"].append(
+        {"rol": "usuario", "contenido": initial_question}
+    )
 
     # Combinar el historial de conversación en un solo prompt
     combined_prompt = ""
@@ -127,8 +122,7 @@ def categorize_question(state: GraphState):
     #     combined_prompt += f"{mensaje['rol'].capitalize()}: {mensaje['contenido']}\n"
 
     # Agregar la pregunta actual al prompt
-    combined_prompt += prompt_template.format(
-        initial_question=initial_question)
+    combined_prompt += prompt_template.format(initial_question=initial_question)
 
     # Invocar la cadena de conversación con el prompt combinado
     respuesta = conversation_with_summary_8b.predict(input=combined_prompt)
@@ -140,33 +134,36 @@ def categorize_question(state: GraphState):
 
     print(categoria_pregunta)
 
-    state.update(
-        {"question_category": categoria_pregunta, "num_steps": num_steps})
+    state.update({"question_category": categoria_pregunta, "num_steps": num_steps})
 
     print(f"Tiempo de respuesta de NODO: {time.time() - initial_time}")
 
     return state
+
 
 @traceable
 def product_search(state):
     db_uri = os.getenv("SQL_DATABASE_URI")
     db = SQLDatabase.from_uri(db_uri)
     print("-- SQL DATABASE --")
-    print(f'SQL DATABASE DIALECT: {db.dialect}')
-    print(f'SQL DATABASE TABLES: {db.get_usable_table_names()}')
+    print(f"SQL DATABASE DIALECT: {db.dialect}")
+    print(f"SQL DATABASE TABLES: {db.get_usable_table_names()}")
 
     chain = create_sql_query_chain(GROQ_LLM_8, db)
 
     base_question = "Esta pregunta puede contener un nombre de producto o medicamento desconocido. Si hay un nombre desconocido, buscalo en la columna Nombre."
-    response = chain.invoke({ "question": f'{base_question} {state["initial_question"]}'})
-    print(f'SQL chain response: {response}')
+    response = chain.invoke(
+        {"question": f'{base_question} {state["initial_question"]}'}
+    )
+    print(f"SQL chain response: {response}")
     sql_query = response.split("\nSQLQuery:")[1]
-    print(f'SQL Query: {sql_query}')
+    print(f"SQL Query: {sql_query}")
     result = db.run(sql_query)
-    state['product_query'] = sql_query
-    state['relevant_products'] = result
+    state["product_query"] = sql_query
+    state["relevant_products"] = result
 
     return state
+
 
 @traceable
 def product_inquiry_response(state):
@@ -185,23 +182,25 @@ def product_inquiry_response(state):
     )
 
     print("---REALIZANDO LLAMADA AL ENDPOINT DE PRODUCTOS---")
-    products = state['relevant_products']
+    products = state["relevant_products"]
     print("---DANDO RESPUESTA A LA CONSULTA DE PRODUCTOS---")
-    initial_question = state['initial_question']
-    num_steps = int(state['num_steps'])
+    initial_question = state["initial_question"]
+    num_steps = int(state["num_steps"])
     num_steps += 1
 
     # Agregar la pregunta actual al prompt
     input = prompt.template.format(
-        initial_question=initial_question, products=products, product_query=state['product_query'])
+        initial_question=initial_question,
+        products=products,
+        product_query=state["product_query"],
+    )
 
     # Invocar la cadena de conversación con el prompt combinado
     print(input)
     response = conversation_with_summary_70b.predict(input=input)
     print(response)
     # Agregar la respuesta del modelo al historial de conversación
-    state['conversation_history'].append(
-        {"rol": "asistente", "contenido": response})
+    state["conversation_history"].append({"rol": "asistente", "contenido": response})
 
     state.update({"final_response": response, "num_steps": num_steps})
 
@@ -209,26 +208,23 @@ def product_inquiry_response(state):
 
     return state
 
-
 custom_prompt_template = """Utiliza la siguiente información para responder la pregunta del usuario.
 Si no conoces la respuesta, devuelve "RESPUESTA_NO_ENCONTRADA". No trates de inventar una respuesta.
 
-
 Contexto: {context}
 Pregunta: {question}
-
 
 Solo devuelve la respuesta útil a continuación y nada más.
 Respuesta útil:
 """
 
-
 def set_custom_prompt():
     """
     Prompt template for QA retrieval for each vectorstore
     """
-    prompt = PromptTemplate(template=custom_prompt_template,
-                            input_variables=['context', 'question'])
+    prompt = PromptTemplate(
+        template=custom_prompt_template, input_variables=["context", "question"]
+    )
     return prompt
 
 
@@ -244,47 +240,42 @@ def retrieval_qa_chain(llm, prompt, vectorstore):
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
-        retriever=vectorstore.as_retriever(search_kwargs={'k': 3}),
+        retriever=vectorstore.as_retriever(search_kwargs={"k": 3}),
         return_source_documents=False,
-        chain_type_kwargs={'prompt': prompt}
+        chain_type_kwargs={"prompt": prompt},
     )
     return qa_chain
 
-
 def qa_bot():
     embeddings = FastEmbedEmbeddings()
-    vectorstore = Qdrant(
-        client=client, embeddings=embeddings, collection_name="rag")
+    vectorstore = Qdrant(client=client, embeddings=embeddings, collection_name="rag")
     llm = chat_model
     qa_prompt = set_custom_prompt()
     qa = retrieval_qa_chain(llm, qa_prompt, vectorstore)
     return qa
 
-
 def other_inquiry_response(state):
 
     initial_time = time.time()
     print("---RESPONDIENDO A CONSULTA DESDE RAG---")
-    num_steps = int(state['num_steps'])
+    num_steps = int(state["num_steps"])
     num_steps += 1
 
     chain = qa_bot()
 
-    initial_question = state['initial_question']
+    initial_question = state["initial_question"]
 
     response = chain.invoke({"query": initial_question})["result"]
 
     if "RESPUESTA_NO_ENCONTRADA" in response:
         response = "Lo siento, no tengo información sobre eso."
 
-    state['conversation_history'].append(
-        {"rol": "asistente", "contenido": response})
+    state["conversation_history"].append({"rol": "asistente", "contenido": response})
     state.update({"final_response": response, "num_steps": num_steps})
 
     print(f"Tiempo de respuesta de NODO: {time.time() - initial_time}")
 
     return state
-
 
 def state_printer(state):
     """Imprime el estado."""
@@ -294,13 +285,12 @@ def state_printer(state):
     print(f"Respuesta: {state['final_response']}\n")
     print(f"Pasos: {state['num_steps']}\n")
     print("Historial de Conversación:")
-    for message in state.get('conversation_history', []):
+    for message in state.get("conversation_history", []):
         print(f"{message['rol'].capitalize()}: {message['contenido']}")
     return
 
 
 """## Conditional Edges"""
-
 
 def route_to_respond(state):
     """
@@ -312,18 +302,19 @@ def route_to_respond(state):
     """
 
     print("---RUTA PARA RESPONDER---")
-    question_category = state['question_category']
+    question_category = state["question_category"]
 
-    if question_category == 'producto':
+    if question_category == "producto":
         print("---RUTA A RESPUESTA DE CONSULTA DE PRODUCTO---")
         return "product_response"
-    elif question_category == 'otro':
+    elif question_category == "otro":
         print("---RUTA A RESPUESTA DE CONSULTA DESDE RAG---")
         return "other_inquiry_response"
     else:
         # Manejar categoría inesperada (error nodo clasificador)
         print("---CATEGORÍA INESPERADA---")
         return "state_printer"
+
 
 """## Build the Graph
 ### Add Nodes
@@ -359,6 +350,7 @@ app = workflow.compile()
 
 states = []
 
+
 def retrieve_state(conversation_id):
     global states
     for state in states:
@@ -370,8 +362,9 @@ def retrieve_state(conversation_id):
         "final_response": "",
         "num_steps": 0,
         "conversation_history": [],
-        "conversation_id": conversation_id
+        "conversation_id": conversation_id,
     }
+
 
 def execute_agent(question, conversation_id):
     global states  # Ensure state is recognized as global
@@ -382,7 +375,9 @@ def execute_agent(question, conversation_id):
 
     return output
 
+
 # NO BORRAR!! PARA PRUEBAS DESDE CONSOLA
+
 
 def main():
     while True:
@@ -390,6 +385,7 @@ def main():
         conversation_id = int(input("Ingresar ID de conversación: "))
         output = execute_agent(question, conversation_id)
         print(output)
+
 
 if __name__ == "__main__":
     main()

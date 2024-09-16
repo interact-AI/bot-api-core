@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import os
 import nest_asyncio  # noqa: E402
 import chardet
+
 nest_asyncio.apply()
 
 # bring in our LLAMA_CLOUD_API_KEY
@@ -34,10 +35,12 @@ def load_or_parse_data():
     else:
         # Perform the parsing step and store the result in llama_parse_documents
         parsingInstruction = """The provided document is information about a pharmacy"""
-        parser = LlamaParse(api_key=llamaparse_api_key, result_type="markdown",
-                            parsing_instruction=parsingInstruction)
-        llama_parse_documents = parser.load_data(
-            "./data/HorarioDeLaFarmacia.txt")
+        parser = LlamaParse(
+            api_key=llamaparse_api_key,
+            result_type="markdown",
+            parsing_instruction=parsingInstruction,
+        )
+        llama_parse_documents = parser.load_data("./data/HorarioDeLaFarmacia.txt")
 
         # Save the parsed data to a file
         with open(data_file, "wb") as f:
@@ -64,15 +67,14 @@ def create_vector_database():
     # print(llama_parse_documents[1].text[:100])
 
     # Open the file in append mode ('a')
-    with open('data/output.md', 'a', encoding='iso-8859-1', errors='replace') as f:
+    with open("data/output.md", "a", encoding="iso-8859-1", errors="replace") as f:
         for doc in llama_parse_documents:
-            f.write(doc.text + '\n')
+            f.write(doc.text + "\n")
 
-    loader = DirectoryLoader('data/', glob="**/*.md", show_progress=True)
+    loader = DirectoryLoader("data/", glob="**/*.md", show_progress=True)
     documents = loader.load()
     # Split loaded documents into chunks
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=2000, chunk_overlap=100)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=100)
     docs = text_splitter.split_documents(documents)
 
     # len(docs)
@@ -87,7 +89,7 @@ def create_vector_database():
         embedding=embeddings,
         url=qdrant_url,
         collection_name="rag",
-        api_key=qdrant_api_key
+        api_key=qdrant_api_key,
     )
 
     # query it
@@ -95,7 +97,7 @@ def create_vector_database():
     # found_doc = qdrant.similarity_search(query, k=3)
     # print(found_doc[0][:100])
 
-    print('Vector DB created successfully !')
+    print("Vector DB created successfully !")
 
 
 if __name__ == "__main__":
