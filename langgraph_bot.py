@@ -52,6 +52,7 @@ conversation_with_summary_8b = ConversationChain(
 ## State
 """
 
+
 # State
 class GraphState(TypedDict):
     """
@@ -73,6 +74,7 @@ class GraphState(TypedDict):
     relevant_products: List[str]
     product_query: str
 
+
 """## Nodes
 
 1. categorize_question
@@ -80,6 +82,7 @@ class GraphState(TypedDict):
 3. other_inquiry_response(RAG)
 4. state_printer
 """
+
 
 @traceable
 def categorize_question(state: GraphState):
@@ -208,6 +211,7 @@ def product_inquiry_response(state):
 
     return state
 
+
 custom_prompt_template = """Utiliza la siguiente información para responder la pregunta del usuario.
 Si no conoces la respuesta, devuelve "RESPUESTA_NO_ENCONTRADA". No trates de inventar una respuesta.
 
@@ -217,6 +221,7 @@ Pregunta: {question}
 Solo devuelve la respuesta útil a continuación y nada más.
 Respuesta útil:
 """
+
 
 def set_custom_prompt():
     """
@@ -246,6 +251,7 @@ def retrieval_qa_chain(llm, prompt, vectorstore):
     )
     return qa_chain
 
+
 def qa_bot():
     embeddings = FastEmbedEmbeddings()
     vectorstore = Qdrant(client=client, embeddings=embeddings, collection_name="rag")
@@ -253,6 +259,7 @@ def qa_bot():
     qa_prompt = set_custom_prompt()
     qa = retrieval_qa_chain(llm, qa_prompt, vectorstore)
     return qa
+
 
 def other_inquiry_response(state):
 
@@ -277,6 +284,7 @@ def other_inquiry_response(state):
 
     return state
 
+
 def state_printer(state):
     """Imprime el estado."""
     print("---IMPRESORA DE ESTADO---")
@@ -291,6 +299,7 @@ def state_printer(state):
 
 
 """## Conditional Edges"""
+
 
 def route_to_respond(state):
     """
