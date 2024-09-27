@@ -13,7 +13,9 @@ class EchoBot(ActivityHandler):
     ):
         for member in members_added:
             if member.id != turn_context.activity.recipient.id:
-                await turn_context.send_activity("Buenas que tal soy un bot de lenguaje natural, ¿en qué puedo ayudarte?")
+                await turn_context.send_activity(
+                    "Buenas! Que tal? Soy un bot de lenguaje natural, ¿en qué puedo ayudarte?"
+                )
 
     async def on_message_activity(self, turn_context: TurnContext):
         initial_time = time.time()

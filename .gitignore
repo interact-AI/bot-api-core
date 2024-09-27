@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+
+# Virtualenv
+.venv/
+.env
+*.egg-info/
+*.egg
+
+# Data
+data/*
+
+# Python bytecode
+*.pyc
+*.pyo
+
+# IDEs and code editors
+*.impyla
+*.impylb
+*.sas
+
+# Visual Studio Code
+*.minified*
+Debug*
+*.pgm
+*.spt
+*.flp
+*.pyc
+*.pyo
+
+# Mac (OSX)
+.DS_Store
+
+# Django
+*.pyc
+*.pyo
+*.egg-info
+
+# Bibliotheca
+*.txt
+*.old
+
+# Local Files
+*.local
+
+# Compiled Source
+*.kdel
+*.snmp
+
+# Gradle
+*.pom
+
+# XML
+*.xml
+*.pom
+*.config
+config.json
+
+# Oracle
+*.oci
+
+# Docker
+*.json

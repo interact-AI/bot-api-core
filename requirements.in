@@ -1,0 +1,16 @@
+botbuilder-integration-aiohttp>=4.15.0
+langchain-groq
+duckduckgo-search
+langchain_community
+tiktoken
+langchainhub
+langchain
+langgraph==0.2.14
+typing_extensions
+typing
+langchain-community
+llama-parse
+qdrant_client
+python-dotenv
+fastembed
+unstructured[md]

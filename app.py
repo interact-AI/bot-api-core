@@ -1,93 +1,29 @@
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License.
+from flask import Flask, request, jsonify
+from langgraph_bot import execute_agent
+import time
 
-import sys
-import traceback
-from datetime import datetime
-from http import HTTPStatus
-
-from aiohttp import web
-from aiohttp.web import Request, Response, json_response
-from botbuilder.core import (
-    TurnContext,
-)
-from botbuilder.core.integration import aiohttp_error_middleware
-from botbuilder.integration.aiohttp import CloudAdapter, ConfigurationBotFrameworkAuthentication
-from botbuilder.schema import Activity, ActivityTypes
-
-from bots import EchoBot
-from config import DefaultConfig
-import ssl
-
-CONFIG = DefaultConfig()
-
-# Create adapter.
-# See https://aka.ms/about-bot-adapter to learn more about how bots work.
-ADAPTER = CloudAdapter(ConfigurationBotFrameworkAuthentication(CONFIG))
+app = Flask(__name__)
 
 
-# Catch-all for errors.
-async def on_error(context: TurnContext, error: Exception):
-    # This check writes out errors to console log .vs. app insights.
-    # NOTE: In production environment, you should consider logging this to Azure
-    #       application insights.
-    print(f"\n [on_turn_error] unhandled error: {error}", file=sys.stderr)
-    traceback.print_exc()
+@app.route("/status", methods=["GET"])
+def status():
+    return "The server is up and running!"
 
-    # Send a message to the user
-    await context.send_activity("The bot encountered an error or bug.")
-    await context.send_activity(
-        "To continue to run this bot, please fix the bot source code."
+
+@app.route("/message", methods=["POST"])
+def message():
+    message = request.json.get("message")
+    conversation_id = request.headers.get("conversationId")
+    initial_time = time.time()
+    result = execute_agent(message, conversation_id)
+    print(
+        f"Tiempo de respuesta de Agente entero: {
+          time.time() - initial_time}"
     )
-    # Send a trace activity if we're talking to the Bot Framework Emulator
-    if context.activity.channel_id == "emulator":
-        # Create a trace activity that contains the error object
-        trace_activity = Activity(
-            label="TurnError",
-            name="on_turn_error Trace",
-            timestamp=datetime.utcnow(),
-            type=ActivityTypes.trace,
-            value=f"{error}",
-            value_type="https://www.botframework.com/schemas/error",
-        )
-        # Send a trace activity, which will be displayed in Bot Framework Emulator
-        await context.send_activity(trace_activity)
 
+    response = {"response": result["final_response"]}
+    return jsonify(response)
 
-ADAPTER.on_turn_error = on_error
-
-# Create the Bot
-BOT = EchoBot()
-
-
-# Listen for incoming requests on /api/messages
-async def messages(req: Request) -> Response:
-    print("Received message")
-    body = await req.json()
-    print(body)
-    activity = Activity().deserialize(body)
-    auth_header = req.headers["Authorization"] if "Authorization" in req.headers else ""
-
-    response = await ADAPTER.process_activity(auth_header, activity, BOT.on_turn)
-
-    if response:
-        return json_response(data=response.body, status=response.status)
-    return Response(status=HTTPStatus.OK)
-
-async def status(req: Request) -> Response:
-    print("Received status request")
-    return Response(status=HTTPStatus.OK, text="Healthy")
-
-
-APP = web.Application(middlewares=[aiohttp_error_middleware])
-APP.router.add_post("/api/messages", messages)
-APP.router.add_get("/status", status)
 
 if __name__ == "__main__":
-    ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-    ssl_context.load_cert_chain(certfile='cert.pem', keyfile='key.pem')
-
-    try:
-        web.run_app(APP, host="0.0.0.0" ,port=CONFIG.PORT, ssl_context=ssl_context)
-    except Exception as error:
-        raise error
+    app.run(debug=False, host="0.0.0.0", port=80)
