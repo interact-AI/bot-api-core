@@ -14,3 +14,4 @@ qdrant_client
 python-dotenv
 fastembed
 unstructured[md]
+azure-servicebus
