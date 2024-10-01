@@ -30,7 +30,7 @@ async def message():
         "response": result["final_response"],
         "timeStamp": time.time(),
         "ownerId": 1,
-        "phoneNumber": "+598 099669085"
+        "phoneNumber": "+598 099669085",
     }
     async with sender:
         await send_message(sender, info_for_logger)
