@@ -10,7 +10,7 @@ NAMESPACE_CONNECTION_STR = os.getenv("QUEUE_CON_STRING")
 QUEUE_NAME = os.getenv("QUEUE_NAME")
 
 
-async def create_sender() -> ServiceBusSender:
+def create_sender() -> ServiceBusSender:
     servicebus_client = ServiceBusClient.from_connection_string(
         conn_str=NAMESPACE_CONNECTION_STR, logging_enable=True
     )

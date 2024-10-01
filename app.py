@@ -4,6 +4,7 @@ import time
 from send_to_logger import create_sender, send_message
 
 app = Flask(__name__)
+sender = create_sender()
 
 
 @app.route("/status", methods=["GET"])
@@ -32,11 +33,16 @@ async def message():
         "ownerId": 1,
         "phoneNumber": "+598 099669085",
     }
+    time_to_send = time.time()
     async with sender:
         await send_message(sender, info_for_logger)
+    print(
+        f"Tiempo de respuesta envio a logger: {
+            time.time() - time_to_send}"
+    )
     return jsonify(response)
 
 
 if __name__ == "__main__":
-    sender = create_sender()
+
     app.run(debug=False, host="0.0.0.0", port=80)
