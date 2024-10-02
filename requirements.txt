@@ -440,3 +440,5 @@ zipp==3.20.1
 # setuptools
 azure-servicebus
 pyodbc
+flask
+flask[async]

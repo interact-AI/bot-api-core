@@ -15,3 +15,5 @@ python-dotenv
 fastembed
 unstructured[md]
 azure-servicebus
+flask
+flask[async]
