@@ -34,8 +34,11 @@ async def message():
         "phoneNumber": "+598 099669085",
     }
     time_to_send = time.time()
-    async with sender:
-        await send_message(sender, info_for_logger)
+    try:
+        async with sender:
+            await send_message(sender, info_for_logger)
+    except Exception as e:
+        print(f"Error al enviar a logger {e}")
     print(
         f"Tiempo de respuesta envio a logger: {
             time.time() - time_to_send}"
