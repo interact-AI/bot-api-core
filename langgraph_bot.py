@@ -23,6 +23,8 @@ from langsmith import traceable
 
 load_dotenv()
 
+db_uri = os.getenv("SQL_DATABASE_URI")
+db = SQLDatabase.from_uri(db_uri)
 # PRODUCT SEARCH DEPENDENCIES
 
 
@@ -149,8 +151,6 @@ def categorize_question(state: GraphState):
 
 @traceable
 def product_search(state):
-    db_uri = os.getenv("SQL_DATABASE_URI")
-    db = SQLDatabase.from_uri(db_uri)
     print("-- SQL DATABASE --")
     print(f"SQL DATABASE DIALECT: {db.dialect}")
     print(f"SQL DATABASE TABLES: {db.get_usable_table_names()}")
