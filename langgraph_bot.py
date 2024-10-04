@@ -22,9 +22,10 @@ from dotenv import load_dotenv
 from langsmith import traceable
 
 load_dotenv()
-
+print("Connecting to SQL Database...")
 db_uri = os.getenv("SQL_DATABASE_URI")
 db = SQLDatabase.from_uri(db_uri)
+print("Connected to SQL Database!")
 # PRODUCT SEARCH DEPENDENCIES
 
 
