@@ -20,6 +20,7 @@ from qdrant_client import QdrantClient
 from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
 from langsmith import traceable
+import re
 
 load_dotenv()
 print("Connecting to SQL Database...")
@@ -129,8 +130,7 @@ def categorize_question(state: GraphState):
     #     combined_prompt += f"{mensaje['rol'].capitalize()}: {mensaje['contenido']}\n"
 
     # Agregar la pregunta actual al prompt
-    combined_prompt += prompt_template.format(
-        initial_question=initial_question)
+    combined_prompt += prompt_template.format(initial_question=initial_question)
 
     # Invocar la cadena de conversación con el prompt combinado
     respuesta = conversation_with_summary_8b.predict(input=combined_prompt)
@@ -142,12 +142,19 @@ def categorize_question(state: GraphState):
 
     print(categoria_pregunta)
 
-    state.update(
-        {"question_category": categoria_pregunta, "num_steps": num_steps})
+    state.update({"question_category": categoria_pregunta, "num_steps": num_steps})
 
     print(f"Tiempo de respuesta de NODO: {time.time() - initial_time}")
 
     return state
+
+
+def extract_sql_query(input_string):
+    match = re.search(r'SQLQuery:\s*"([^"]*)"', input_string)
+    if match:
+        return match.group(1)
+    else:
+        return None
 
 
 @traceable
@@ -155,15 +162,39 @@ def product_search(state):
     print("-- SQL DATABASE --")
     print(f"SQL DATABASE DIALECT: {db.dialect}")
     print(f"SQL DATABASE TABLES: {db.get_usable_table_names()}")
+    table_name = os.getenv("MEDICAMENTOS_TABLE")
+    table_info = db.get_table_info([table_name])
 
-    chain = create_sql_query_chain(GROQ_LLM_8, db)
+    prompt_template = PromptTemplate(
+        template="""\
+        Dada una pregunta de entrada, primero cree una consulta {dialect} sintácticamente correcta para ejecutar, luego observe los resultados de la consulta y devuelva la respuesta.
+Utilice el siguiente formato:
 
-    base_question = "Esta pregunta puede contener un nombre de producto o medicamento desconocido. Si hay un nombre desconocido, buscalo en la columna Nombre."
-    response = chain.invoke(
-        {"question": f'{base_question} {state["initial_question"]}'}
+Pregunta: "Pregunta aquí"
+SQLQuery: "Consulta SQL para ejecutar"
+SQLResult: "Resultado de la consulta SQL"
+Respuesta: "Respuesta final aquí"
+
+Use solo la siguientes tabla "{table_name}":
+
+{table_info}
+
+Esta pregunta puede contener un nombre completo o parcial de producto o medicamento desconocido, en ese caso buscalo en la columna Nombre. De lo contrario, busca en la columna que te parezca pertinente.
+Pregunta de entrada: {initial_question}
+        """,
+        input_variables=["dialect", "table_name", "table_info", "initial_question"],
     )
+
+    prompt = prompt_template.template.format(
+        initial_question=state["initial_question"],
+        dialect=db.dialect,
+        table_info=table_info,
+        table_name=table_name,
+    )
+    response = conversation_with_summary_70b.predict(input=prompt)
+
     print(f"SQL chain response: {response}")
-    sql_query = response.split("\nSQLQuery:")[1]
+    sql_query = extract_sql_query(response)
     print(f"SQL Query: {sql_query}")
     result = db.run(sql_query)
     state["product_query"] = sql_query
@@ -207,8 +238,7 @@ def product_inquiry_response(state):
     response = conversation_with_summary_70b.predict(input=input)
     print(response)
     # Agregar la respuesta del modelo al historial de conversación
-    state["conversation_history"].append(
-        {"rol": "asistente", "contenido": response})
+    state["conversation_history"].append({"rol": "asistente", "contenido": response})
 
     state.update({"final_response": response, "num_steps": num_steps})
 
@@ -233,8 +263,7 @@ def set_custom_prompt():
     Prompt template for QA retrieval for each vectorstore
     """
     prompt = PromptTemplate(
-        template=custom_prompt_template, input_variables=[
-            "context", "question"]
+        template=custom_prompt_template, input_variables=["context", "question"]
     )
     return prompt
 
@@ -260,8 +289,7 @@ def retrieval_qa_chain(llm, prompt, vectorstore):
 
 def qa_bot():
     embeddings = FastEmbedEmbeddings()
-    vectorstore = Qdrant(
-        client=client, embeddings=embeddings, collection_name="rag")
+    vectorstore = Qdrant(client=client, embeddings=embeddings, collection_name="rag")
     llm = chat_model
     qa_prompt = set_custom_prompt()
     qa = retrieval_qa_chain(llm, qa_prompt, vectorstore)
@@ -284,8 +312,7 @@ def other_inquiry_response(state):
     if "RESPUESTA_NO_ENCONTRADA" in response:
         response = "Lo siento, no tengo información sobre eso."
 
-    state["conversation_history"].append(
-        {"rol": "asistente", "contenido": response})
+    state["conversation_history"].append({"rol": "asistente", "contenido": response})
     state.update({"final_response": response, "num_steps": num_steps})
 
     print(f"Tiempo de respuesta de NODO: {time.time() - initial_time}")
