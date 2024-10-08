@@ -11,10 +11,10 @@ QUEUE_NAME = os.getenv("QUEUE_NAME")
 
 
 def create_sender() -> ServiceBusSender:
-    servicebus_client = ServiceBusClient.from_connection_string(
+    service_bus_client = ServiceBusClient.from_connection_string(
         conn_str=NAMESPACE_CONNECTION_STR, logging_enable=True
     )
-    sender = servicebus_client.get_queue_sender(queue_name=QUEUE_NAME)
+    sender = service_bus_client.get_queue_sender(queue_name=QUEUE_NAME)
     return sender
 
 

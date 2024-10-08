@@ -25,11 +25,13 @@ async def message():
     )
 
     response = {"response": result["final_response"]}
+
     info_for_logger = {
         "conversationId": conversation_id,
         "message": message,
         "response": result["final_response"],
         "timeStamp": time.time(),
+        # TODO: Change ownerId and phoneNumber to the real owner
         "ownerId": 1,
         "phoneNumber": "+598 099669085",
     }
