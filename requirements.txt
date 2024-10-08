@@ -328,7 +328,7 @@ python-iso639==2024.4.27
     # via unstructured
 python-magic==0.4.27
     # via unstructured
-pywin32==307
+pywin32==307; platform_system == 'Windows'
     # via portalocker
 pyyaml==6.0.2
     # via
