@@ -19,8 +19,10 @@ jobs:
           python-version: 3.12.4
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
-
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
 
       - name: Check code formatting with Black
         run: |
