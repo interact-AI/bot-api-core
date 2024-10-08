@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """LangGraph Memory Test"""
 
+from langchain.chains import create_sql_query_chain
+from langchain_community.utilities import SQLDatabase
+import getpass
 import requests
 from typing import List, Dict
 from typing_extensions import TypedDict
@@ -17,14 +20,15 @@ from qdrant_client import QdrantClient
 from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
 from langsmith import traceable
+import re
 
 load_dotenv()
-
+print("Connecting to SQL Database...")
+db_uri = os.getenv("SQL_DATABASE_URI")
+db = SQLDatabase.from_uri(db_uri)
+print("Connected to SQL Database!")
 # PRODUCT SEARCH DEPENDENCIES
-import getpass
 
-from langchain_community.utilities import SQLDatabase
-from langchain.chains import create_sql_query_chain
 
 # PRODUCT SEARCH DEPENDENCIES
 
@@ -43,6 +47,7 @@ GROQ_LLM_8 = ChatGroq(
 conversation_with_summary_8b = ConversationChain(
     llm=GROQ_LLM_8,
 )
+
 
 # llama3-70b-8192
 # llama3-8b-8192
@@ -144,22 +149,52 @@ def categorize_question(state: GraphState):
     return state
 
 
+def extract_sql_query(input_string):
+    match = re.search(r'SQLQuery:\s*"([^"]*)"', input_string)
+    if match:
+        return match.group(1)
+    else:
+        return None
+
+
 @traceable
 def product_search(state):
-    db_uri = os.getenv("SQL_DATABASE_URI")
-    db = SQLDatabase.from_uri(db_uri)
     print("-- SQL DATABASE --")
     print(f"SQL DATABASE DIALECT: {db.dialect}")
     print(f"SQL DATABASE TABLES: {db.get_usable_table_names()}")
+    table_name = os.getenv("MEDICAMENTOS_TABLE")
+    table_info = db.get_table_info([table_name])
 
-    chain = create_sql_query_chain(GROQ_LLM_8, db)
+    prompt_template = PromptTemplate(
+        template="""\
+        Dada una pregunta de entrada, primero cree una consulta {dialect} sintácticamente correcta para ejecutar, luego observe los resultados de la consulta y devuelva la respuesta.
+Utilice el siguiente formato:
 
-    base_question = "Esta pregunta puede contener un nombre de producto o medicamento desconocido. Si hay un nombre desconocido, buscalo en la columna Nombre."
-    response = chain.invoke(
-        {"question": f'{base_question} {state["initial_question"]}'}
+Pregunta: "Pregunta aquí"
+SQLQuery: "Consulta SQL para ejecutar"
+SQLResult: "Resultado de la consulta SQL"
+Respuesta: "Respuesta final aquí"
+
+Use solo la siguientes tabla "{table_name}":
+
+{table_info}
+
+Esta pregunta puede contener un nombre completo o parcial de producto o medicamento desconocido, en ese caso buscalo en la columna Nombre. De lo contrario, busca en la columna que te parezca pertinente.
+Pregunta de entrada: {initial_question}
+        """,
+        input_variables=["dialect", "table_name", "table_info", "initial_question"],
     )
+
+    prompt = prompt_template.template.format(
+        initial_question=state["initial_question"],
+        dialect=db.dialect,
+        table_info=table_info,
+        table_name=table_name,
+    )
+    response = conversation_with_summary_70b.predict(input=prompt)
+
     print(f"SQL chain response: {response}")
-    sql_query = response.split("\nSQLQuery:")[1]
+    sql_query = extract_sql_query(response)
     print(f"SQL Query: {sql_query}")
     result = db.run(sql_query)
     state["product_query"] = sql_query
